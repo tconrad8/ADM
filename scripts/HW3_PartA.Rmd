@@ -1,0 +1,301 @@
+---
+title: "HW3_PartA"
+author: "Tyler Conrad"
+date: "December 3, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r libraries}
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(ggplot2)
+library(tidyverse)
+library(ROCR)
+library(cluster)
+library(clusterSim)
+library(fpc)
+library(dummies)
+library(clustMixType)
+library(klaR)
+options(scipen = 999)
+```
+
+```{r read_data}
+crash <- read.csv("C:/Users/tconrad8/Desktop/MS_BSIA/6301/HW3/data/crash.csv")
+```
+
+```{r add_region}
+crash$Region<-ifelse(crash$State=="Illinois"|crash$State=="Indiana"|crash$State=="Michigan"|crash$State=="Ohio"|crash$State=="Wisconsin"|crash$State=="Iowa"|crash$State=="Kansas"|crash$State=="Minnesota"|crash$State=="Missouri"|crash$State=="Nebraska"|crash$State=="North Dakota"|crash$State=="South Dakota","Midwest",
+
+                            ifelse(crash$State=="Connecticut"|crash$State=="Maine"|crash$State=="Massachusetts"|crash$State=="New Hampshire"| crash$State=="Rhode Island"|crash$State=="Vermont"| crash$State=="New Jersey"|crash$State=="New York"| crash$State=="Pennsylvania", "Northeast",
+       
+ifelse(crash$State=="Arizona"|crash$State=="Colorado"|crash$State=="Idaho"|crash$State=="Montana"|crash$State=="Nevada"|crash$State=="New Mexico"|crash$State=="Utah"|crash$State=="Wyoming"|crash$State=="Alaska"|crash$State=="California"|crash$State=="Hawaii"|crash$State=="Oregon"|crash$State=="Washington","West",
+
+ifelse(crash$State=="Delaware"|crash$State=="Florida"|crash$State=="Georgia isntal"|crash$State=="Maryland"|crash$State=="North Carolina"|crash$State=="South Carolina"|crash$State=="Virginia"|crash$State=="District of Columbia"|crash$State=="West Virginia"|crash$State=="Alabama"|crash$State=="Kentucky"|crash$State=="Mississippi"|crash$State=="Tennessee"|crash$State=="Arkansas"|crash$State=="Louisiana"|crash$State=="Oklahoma"|crash$State=="Texas"|crash$State=="Georgia","South","NA"))))
+ 
+```
+
+```{r roadway}
+summary(crash$Roadway)
+
+crash$Roadway[crash$Roadway == "\\N"] <-"Unknown"
+
+summary(crash$Roadway)
+
+```
+
+
+```{r age}
+summary(crash$Age)
+hist(na.omit(crash$Age),
+     main = "Age Distribution",
+     xlab = "Age",
+     border = "blue",
+     col = "green",
+     las=1,
+     prob = TRUE)
+lines(density(na.omit(crash$Age)))
+
+mean_age = mean(crash$Age, na.rm = TRUE)
+
+crash$Age<-ifelse(is.na(crash$Age)|crash$Age =='',mean_age,crash$Age)
+```
+
+```{r alcohol}
+summary(crash$Alcohol.Results)
+
+hist(na.omit(crash$Alcohol.Results),
+     main = "Alcohol Results",
+     xlab = "BAC",
+     border = "blue",
+     col = "green",
+     las=1,
+     prob = TRUE)
+lines(density(na.omit(crash$Alcohol.Results)))
+
+crash$Alcohol.Results<-ifelse(is.na(crash$Alcohol.Results)|crash$Alcohol.Results =='',0,crash$Alcohol.Results)
+
+```
+
+```{r person_type}
+summary(crash$Person.Type)
+```
+
+```{r drugs}
+summary(crash$Drug.Involvement)
+
+crash$Drug.Involvement[crash$Drug.Involvement == "Not Reported"] <-"Unknown"
+
+summary(crash$Drug.Involvement)
+```
+
+```{r race}
+summary(crash$Race)
+
+crash$Race <- gsub("[[:punct:]]", "\\N", crash$Race)
+crash$Race<- sub("NN", "Unknown", crash$Race)
+
+
+crash$Race[is.na(crash$Race) | crash$Race == '' ] <-"Unknown"
+
+summary(crash$Race)
+
+```
+
+```{r gender}
+summary(crash$Gender)
+
+crash$Gender[crash$Gender == "Not Reported"] <-"Unknown"
+
+summary(crash$Gender)
+```
+
+```{r Accident_ID}
+  
+IDVector <- vector()
+IDVector[1] <- 1
+for (i in 2:nrow(crash)) {
+     if(crash$State[i] == crash$State[i-1] && 
+        crash$Atmospheric.Condition[i] == crash$Atmospheric.Condition[i-1]  &&
+        crash$Crash.Date[i] == crash$Crash.Date[i-1] &&
+        crash$Roadway[i] == crash$Roadway[i-1])
+        {
+        IDVector[i] <- IDVector[i-1]
+        }else
+        {
+        IDVector[i] <- (IDVector[i-1]+1)
+        }
+}
+crash$AccidentID <- IDVector  
+  
+```
+
+
+```{r write_data}
+write.csv(crash, file = "crash_temp.csv")
+
+```
+
+```{r normalize data}
+
+#normalize<- function(x,na.rm=TRUE){(x-min(x,na.rm=TRUE))/(max(x,na.rm=TRUE)-min(x.na.rm=TRUE))}
+#crash$Age<-normalize(crash$Age)
+
+```
+
+```{r remove_date}
+
+crash$Crash.Date.year <- NULL
+crash$Crash.Date.month <- NULL
+crash$Crash.Date.day.of.month <- NULL
+crash$Crash.Date.day.of.week <- NULL
+crash$Crash.Date <- NULL
+
+```
+
+```{r write_data}
+write.csv(crash, file = "crash_temp_norm.csv")
+
+```
+
+```{r build_table}
+
+i = 0
+
+AccidentID_max = max(crash$AccidentID)
+
+
+crash_ID <- data.frame(matrix(, nrow = AccidentID_max, ncol = 10))
+
+names(crash_ID)[names(crash_ID) == 'X1'] <- 'AccidentID'
+names(crash_ID)[names(crash_ID) == 'X2'] <- 'Atmospheric.Condition'
+names(crash_ID)[names(crash_ID) == 'X3'] <- 'Fatalities.in.Crash'
+names(crash_ID)[names(crash_ID) == 'X4'] <- 'Roadway'
+names(crash_ID)[names(crash_ID) == 'X5'] <- 'Age'
+names(crash_ID)[names(crash_ID) == 'X6'] <- 'Alcohol.Involved'
+names(crash_ID)[names(crash_ID) == 'X7'] <- 'Drugs.Involved'
+names(crash_ID)[names(crash_ID) == 'X8'] <- 'Male.Driver'
+names(crash_ID)[names(crash_ID) == 'X9'] <- 'Female.Driver'
+names(crash_ID)[names(crash_ID) == 'X10'] <- 'Region'
+
+crash_ID[, c(2,4,10)] <- sapply(crash_ID[, c(2,4,10)], as.character)
+
+for(i in 1:AccidentID_max)
+  {
+    crash_ID$AccidentID[i] <- i
+  }
+
+i = 0
+j = 0
+
+for (i in 1:nrow(crash_ID)) 
+    {
+    j = 0
+    for (j in 1:nrow(crash))
+      {
+      if(crash_ID$AccidentID[i] == crash$AccidentID[j])
+        {crash_ID$Atmospheric.Condition[i] <- as.character(crash$Atmospheric.Condition[j])
+        crash_ID$Fatalities.in.Crash[i] <- crash$Fatalities.in.crash[j]
+        crash_ID$Roadway[i] <- as.character(crash$Roadway[j])
+        crash_ID$Region[i] <- as.character(crash$Region[j])
+        } 
+      
+      if(crash_ID$AccidentID[i] == crash$AccidentID[j] &&
+         crash$Person.Type[j] == "Driver of a Motor Vehicle In-Transport")
+        {
+        crash_ID$Age[i] <- crash$Age[j]
+        }
+      if(is.na(crash_ID$Age[i] == TRUE))
+        {crash_ID$Age[i] <- mean_age}
+      
+      if(crash_ID$AccidentID[i] == crash$AccidentID[j] &&
+         crash$Person.Type[j] == "Driver of a Motor Vehicle In-Transport" &&
+         crash$Alcohol.Results[j] > 0 )
+        {
+        crash_ID$Alcohol.Involved[i] <- "Yes"
+        }else if(crash_ID$AccidentID[i] == crash$AccidentID[j] &&
+         crash$Person.Type[j] == "Driver of a Motor Vehicle In-Transport" &&
+         crash$Alcohol.Results[j] == 0)
+          {
+          crash_ID$Alcohol.Involved[i] <- "No"
+        }
+      if(is.na(crash_ID$Alcohol.Involved[i] == TRUE))
+        {crash_ID$Alcohol.Involved[i] <- "Unknown"}
+      
+      if(crash_ID$AccidentID[i] == crash$AccidentID[j] &&
+         crash$Person.Type[j] == "Driver of a Motor Vehicle In-Transport")
+        {
+        if(crash$Drug.Involvement[j] == "Yes")
+          {
+          crash_ID$Drugs.Involved[i] <- "Yes"
+          }
+          else if(crash_ID$AccidentID[i] == crash$AccidentID[j] &&
+          crash$Person.Type[j] == "Driver of a Motor Vehicle In-Transport" &&
+          crash$Drug.Involvement[j] == "No")
+            {
+            crash_ID$Drugs.Involved[i] <- "No"
+            }
+          else if(crash_ID$AccidentID[i] == crash$AccidentID[j] &&
+          crash$Person.Type[j] == "Driver of a Motor Vehicle In-Transport" &&
+          crash$Drug.Involvement[j] == "Unknown")
+            {
+            crash_ID$Drugs.Involved[i] <- "Unknown"
+            }
+      }
+      if(is.na(crash_ID$Drugs.Involved[i] == TRUE))
+        {crash_ID$Drugs.Involved[i] <- "Unknown"}
+      
+      if(crash_ID$AccidentID[i] == crash$AccidentID[j] &&
+         crash$Person.Type[j] == "Driver of a Motor Vehicle In-Transport" && 
+         crash$Gender[j] == "Male")
+        {crash_ID$Male.Driver[i] <- "Yes"}
+      if(is.na(crash_ID$Male.Driver[i] == TRUE))
+        {crash_ID$Male.Driver[i] <- "No"}
+      
+      if(crash_ID$AccidentID[i] == crash$AccidentID[j] &&
+         crash$Person.Type[j] == "Driver of a Motor Vehicle In-Transport" && crash$Gender[j] == "Female")
+        {crash_ID$Female.Driver[i] <- "Yes"}
+      if(is.na(crash_ID$Female.Driver[i] == TRUE))
+        {crash_ID$Female.Driver[i] <- "No"}
+      }
+    }
+
+
+```
+
+```{r kprototype_analysis}
+
+row.names(crash_ID) <- crash_ID$AccidentID
+crash_ID <-crash_ID[,-1]
+
+crash_ID$Roadway <- as.factor(crash_ID$Roadway)
+crash_ID$Age <- as.factor(crash_ID$Age)
+crash_ID$Alcohol.Involved <- as.factor(crash_ID$Alcohol.Involved)
+crash_ID$Drugs.Involved <- as.factor(crash_ID$Drugs.Involved)
+crash_ID$Male.Driver <- as.factor(crash_ID$Male.Driver)
+crash_ID$Female.Driver <- as.factor(crash_ID$Female.Driver)
+crash_ID$Region <- as.factor(crash_ID$Region)
+
+crashID.kprototype <- kproto(crash_ID, k=6)
+
+summary(crashID.kprototype)
+
+```
+
+```{r kprototype_summary}
+crash_ID$cluster_kprototype <- crashID.kprototype$cluster #use this line to assign cluster ID back to each record.
+
+#view the cereals in each cluster
+subset(crash_ID, cluster_kprototype==1)
+subset(crash_ID, cluster_kprototype==2)
+subset(crash_ID, cluster_kprototype==3)
+subset(crash_ID, cluster_kprototype==4)
+subset(crash_ID, cluster_kprototype==5)
+subset(crash_ID, cluster_kprototype==6)
+```

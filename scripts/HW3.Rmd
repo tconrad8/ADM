@@ -1,0 +1,64 @@
+---
+title: "HW 3"
+author: "Tyler Conrad"
+date: "December 3, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r load_libraries}
+library(pls)
+library(glmnet)
+library(ggplot2)
+library(ggrepel)
+```
+
+```{r load_data}
+univ_data = read.csv("C:/Users/tconrad8/Desktop/MS_BSIA/6301/HW3/data/Universities.csv")
+
+univ_data$State <- NULL    #Remove categorical variable
+univ_data$Public.1..Private.2. <- NULL
+
+univ_data <- na.omit(univ_data) #omit incomplete entries
+
+#States were added to college names via Excel
+
+row.names(univ_data) <- univ_data$CollegeName
+univ_data <- univ_data[,-1]
+```
+
+```{r pcs_analysis}
+
+pcs <- prcomp(univ_data, scale. = T)   #pcs analysis with z-normalize data
+summary(pcs)
+
+```
+
+```{r pcs_review}
+pcs.variance.explained <-(pcs$sdev^2 / sum(pcs$sdev^2))*100
+barplot(pcs.variance.explained, las=2, xlab="Principal Component", ylab="% Variance Explained", main="Principal Components versus Percent of Variance Explained")
+```
+
+```{r elbow_plot}
+screeplot(pcs, type="line")
+```
+
+```{r rotations}
+pcs$rotation
+```
+
+```{r PC_plot}
+scores<-as.data.frame(pcs$x)
+
+#hard to read not useful plot
+ggplot(scores) + geom_point(aes(PC1, PC2), color = 'red') + geom_text_repel(aes(PC1, PC2, label = rownames(scores))) + theme_classic(base_size = 16)
+```
